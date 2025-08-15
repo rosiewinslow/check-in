@@ -1,5 +1,9 @@
 {
   "expo": {
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true },
+    "entryPoint": "expo-router/entry",
+    
     "name": "my-app",
     "slug": "my-app",
     "version": "1.0.0",
@@ -24,9 +28,6 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "plugins": ["expo-router"],
-    "experiments": { "typedRoutes": true },
-    "entryPoint": "expo-router/entry"
+    }
   }
 }
