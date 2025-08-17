@@ -2,21 +2,46 @@ import { useMemo, useState } from "react";
 import {
   View, Text, TextInput, Pressable, FlatList, ScrollView,
 } from "react-native";
+import { Dimensions } from "react-native";
 import {
   useHabitStore,
   weekDays,
-  toISO,
+  // toISO,
   mondayOf,
 } from "../../store/useHabitStore";
 
+// 로컬 자정 기준 YYYY-MM-DD
+const toLocalDateKey = (d: Date) => {
+  const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const y = local.getFullYear();
+  const m = String(local.getMonth() + 1).padStart(2, "0");
+  const day = String(local.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function HabitsScreen() {
-  const { habits, checks, addHabit, removeHabit, renameHabit, toggleCheck /*, clearWeek*/ } =
+  const SCREEN_W = Dimensions.get("window").width;
+
+  // 레이아웃 상수 (필요시 숫자만 조절)
+  const PAGE_PADDING = 16;            // 상위 컨테이너 padding과 동일
+  const NAME_COL_WIDTH = 140;         // 왼쪽 습관명 폭
+  const HORIZONTAL_GAP = 0;           // 칸 사이 간격(현재 0)
+  const INNER_W = SCREEN_W - PAGE_PADDING * 2 - NAME_COL_WIDTH - HORIZONTAL_GAP * 6;
+
+  // ✅ 한 화면에 7칸 딱 맞게
+  const CELL_W = Math.floor(INNER_W / 7);
+
+  const { habits, checks, addHabit, removeHabit, renameHabit, toggleCheck } =
     useHabitStore();
 
-  const [anchor, setAnchor] = useState(new Date()); // 기준일 (이번주: 오늘)
+  const [anchor, setAnchor] = useState(new Date()); 
   const [newHabit, setNewHabit] = useState("");
 
-  const days = useMemo(() => weekDays(anchor), [anchor]);
+  // 로컬 자정으로 정규화
+  const days = useMemo(
+    () => weekDays(anchor).map(d => new Date(d.getFullYear(), d.getMonth(), d.getDate())),
+    [anchor]
+  );
   const dayLabels = ["월", "화", "수", "목", "금", "토", "일"];
 
   const fmtYYMMDD = (d: Date) => {
@@ -35,7 +60,6 @@ export default function HabitsScreen() {
 
   const goPrev = () => setAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7));
   const goNext = () => setAnchor((d) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
-  // "이번주로" 버튼은 제거
 
   const onAddHabit = () => {
     const v = newHabit.trim();
@@ -47,13 +71,13 @@ export default function HabitsScreen() {
   const headerRow = (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       {/* 좌측 상단 빈칸(습관명 자리) */}
-      <View style={{ width: 160 }} />
+      <View style={{ width: NAME_COL_WIDTH }} /> {/* ✅ 상수 적용 */}
       {dayLabels.map((label, i) => (
         <View
           key={i}
           style={{
-            flex: 1,
-            paddingVertical: 8,
+            width: CELL_W,                    
+            paddingVertical: 6,                
             alignItems: "center",
             borderBottomWidth: 1,
             borderColor: "#eee",
@@ -66,47 +90,46 @@ export default function HabitsScreen() {
   );
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 12 }}>
+    <View style={{ flex: 1, padding: PAGE_PADDING /* ✅ 상수 적용 */, gap: 12 }}>
       {/* 상단: 기간 + 주간 이동 버튼 같은 줄 */}
-<View
-  style={{
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  }}
->
-  <Pressable
-    onPress={goPrev}
-    style={{
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#ddd",
-      backgroundColor: "white",
-    }}
-  >
-    <Text style={{ fontWeight: "600" }}>⟨ 저번주</Text>
-  </Pressable>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <Pressable
+          onPress={goPrev}
+          style={{
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#ddd",
+            backgroundColor: "white",
+          }}
+        >
+          <Text style={{ fontWeight: "600" }}>⟨ 저번주</Text>
+        </Pressable>
 
-  <Text style={{ fontSize: 16, fontWeight: "700" }}>{titleRange}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "700" }}>{titleRange}</Text>
 
-  <Pressable
-    onPress={goNext}
-    style={{
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#ddd",
-      backgroundColor: "white",
-    }}
-  >
-    <Text style={{ fontWeight: "600" }}>다음주 ⟩</Text>
-  </Pressable>
-</View>
-
+        <Pressable
+          onPress={goNext}
+          style={{
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#ddd",
+            backgroundColor: "white",
+          }}
+        >
+          <Text style={{ fontWeight: "600" }}>다음주 ⟩</Text>
+        </Pressable>
+      </View>
 
       {/* 습관 추가 */}
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -138,8 +161,15 @@ export default function HabitsScreen() {
         </Pressable>
       </View>
 
-      {/* 매트릭스: 가로 스크롤 */}
-      <ScrollView horizontal bounces={false}>
+      {/* 매트릭스 */}
+      <ScrollView
+        horizontal
+        bounces={false}
+        scrollEnabled={false}                 // ✅ 스와이프 안 생기게
+        contentContainerStyle={{ paddingRight: 0 }} // ✅ 여유 패딩 제거
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+      >
         <View style={{ minWidth: "100%", flex: 1 }}>
           {headerRow}
 
@@ -157,11 +187,13 @@ export default function HabitsScreen() {
                 onToggle={(dateKey) => toggleCheck(item.id, dateKey)}
                 onRename={(v) => renameHabit(item.id, v)}
                 onRemove={() => removeHabit(item.id)}
+                cellWidth={CELL_W}                // ✅ 전달
+                nameColWidth={NAME_COL_WIDTH}     // ✅ 전달
               />
             )}
             ListEmptyComponent={
               <Text style={{ color: "#666", textAlign: "center", marginTop: 24 }}>
-                아직 습관이 없어요. 위에서 추가해봐!
+                아직 습관이 없어요. 위에서 습관을 추가해보세요!
               </Text>
             }
           />
@@ -180,6 +212,8 @@ function HabitRow({
   onToggle,
   onRename,
   onRemove,
+  cellWidth,
+  nameColWidth,
 }: {
   habitId: string;
   name: string;
@@ -189,6 +223,8 @@ function HabitRow({
   onToggle: (dateKey: string) => void;
   onRename: (v: string) => void;
   onRemove: () => void;
+  cellWidth: number;         // ✅ 추가
+  nameColWidth: number;      // ✅ 추가
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -204,8 +240,8 @@ function HabitRow({
       {/* 왼쪽: 습관명(멀티라인 래핑) + 액션 */}
       <View
         style={{
-          width: 160,               // 넓게 잡아 겹침 방지
-          paddingVertical: 10,
+          width: nameColWidth,                 // ✅ 상수 사용
+          paddingVertical: 8,                  // ⬇︎ 살짝 줄임
           paddingHorizontal: 8,
           borderBottomWidth: 1,
           borderColor: "#eee",
@@ -229,7 +265,7 @@ function HabitRow({
               onBlur={commit}
               onSubmitEditing={commit}
               autoFocus
-              multiline    // ✅ 줄바꿈 허용
+              multiline
               style={{
                 flex: 1,
                 borderWidth: 1,
@@ -241,7 +277,6 @@ function HabitRow({
             />
           ) : (
             <Text style={{ fontWeight: "600", flexShrink: 1 }}>
-              {/* ✅ Text는 기본적으로 래핑됨. flexShrink로 공간 확보 */}
               {name}
             </Text>
           )}
@@ -253,29 +288,31 @@ function HabitRow({
         </View>
       </View>
 
-      {/* 오른쪽: 7일 셀 */}
+      {/* 7일 셀 (고정 폭) */}
       {days.map((d, i) => {
-        const dk = toISO(d);
+        const dk = toLocalDateKey(d);
         const checked = !!checks[`${habitId}:${dk}`];
+
         return (
           <Pressable
             key={i}
             onPress={() => onToggle(dk)}
+            hitSlop={10}
             style={{
-              flex: 1,
+              width: cellWidth,                 // ✅ flex 제거, 고정 폭
               alignItems: "center",
               justifyContent: "center",
-              paddingVertical: 14,
+              paddingVertical: 10,              // ⬇︎ 줄임
               borderBottomWidth: 1,
               borderLeftWidth: i === 0 ? 0 : 1,
               borderColor: "#eee",
-              backgroundColor: checked ? color + "22" : "white",
+              backgroundColor: checked ? (color + "22") : "transparent",
             }}
           >
             <View
               style={{
-                width: 22,
-                height: 22,
+                width: 18,                      // ⬇︎ 살짝 줄임
+                height: 18,
                 borderRadius: 6,
                 borderWidth: 1,
                 borderColor: checked ? color : "#ccc",
