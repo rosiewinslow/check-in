@@ -11,12 +11,6 @@ CRUD 완성: 추가/수정/삭제/완료 토글
 7) 카테고리/태그 + 검색
 8) 백업/복구: JSON로 내보내기/가져오기
 
-필요 패키지 ->
-npm i @react-native-async-storage/async-storage
-npm i @react-native-community/datetimepicker
-expo install expo-notifications
-expo install react-native-gesture-handler
-
 
 # 투두리스트 리팩토링
 할거야 ->
@@ -33,3 +27,9 @@ expo install react-native-gesture-handler
 3. 메모 수정은 그냥 눌러서 하면 되는데, 삭제되는게 없음. 걍 뭔가 저장 느낌보단 진짜 잠깐 쓰는 클립보드같이 생겨서 짜침
 4. 진짜 알림 보내주는지 확인해봐야돼.
 5. 근데 이거 저장을 작성시간 기준으로 저장하는거 아니고 목표일자? 해당일자 기준으로 해야 나중에 대시보드에도 그렇게 뽑힘.
+
+# 습관트래커 리팩토링
+할거야 -> 
+1. 뒤에 흰색 배경 없앰
+2. 일요일 토글 안눌리는 문제 해결
+
