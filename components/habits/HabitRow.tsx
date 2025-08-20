@@ -102,7 +102,6 @@ function HabitRowBase({
 
   return (
     <View style={{ flexDirection: "row", alignItems: "stretch" }}>
-      {/* 왼쪽: 이름/액션 (텍스트는 항상 <Text>로 감싸기) */}
       <View
         style={{
           width: nameColWidth,

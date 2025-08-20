@@ -9,7 +9,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="todo" options={{ title: "투두리스트" }} />
       <Tabs.Screen name="habits" options={{ title: "습관트래커" }} />
-      <Tabs.Screen name="dashboard" options={{ title: "대시보드" }} /> 
+      <Tabs.Screen name="dashboard" options={{ title: "캘린더" }} /> 
       <Tabs.Screen name="time" options={{ title: "타임체크" }} />
       <Tabs.Screen name="settings" options={{ title: "세팅" }} />
     </Tabs>

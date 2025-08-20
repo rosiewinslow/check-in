@@ -26,7 +26,7 @@ export default function TodoDetailCard({
   testButton?: boolean;
 }) {
   const { setDetail } = useTodoStore() as any;
-  const locked = todo.date < todayKey();   // 🔒 과거는 읽기 전용
+  const locked = todo.date < todayKey();   //  과거는 읽기 전용
 
   const [note, setNote] = useState<string>(todo.note ?? "");
   const [dueAt, setDueAt] = useState<Date | undefined>(todo.dueAt ? new Date(todo.dueAt) : undefined);
@@ -61,13 +61,13 @@ export default function TodoDetailCard({
     onClose();
   };
 
-  const testNotify = async () => {
-    const fire = new Date(Date.now() + 5000);
-    await Notifications.scheduleNotificationAsync({
-      content: { title: "테스트 알림", body: "이 알림이 보이면 설정 OK" },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire, channelId: "default" },
-    });
-  };
+  // const testNotify = async () => {
+  //   const fire = new Date(Date.now() + 5000);
+  //   await Notifications.scheduleNotificationAsync({
+  //     content: { title: "테스트 알림", body: "이 알림이 보이면 설정 OK" },
+  //     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire, channelId: "default" },
+  //   });
+  // };
 
   return (
     <View style={styles.card}>
@@ -127,11 +127,11 @@ export default function TodoDetailCard({
           />
         )}
 
-        {testButton && (
+        {/* {testButton && (
           <Pressable onPress={testNotify} style={{ padding: 12, borderRadius: 10, backgroundColor: "#f0f0f0" }}>
             <Text style={{ textAlign: "center" }}>알림 테스트 (5초 뒤)</Text>
           </Pressable>
-        )}
+        )} */}
 
         <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
           <Pressable onPress={onClose} style={{ flex: 1, padding: 14, borderRadius: 10, backgroundColor: "#eee" }}>

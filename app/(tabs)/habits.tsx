@@ -65,7 +65,7 @@ export default function HabitsScreen() {
             borderWidth: 1, borderColor: "#ddd", backgroundColor: "white",
           }}
         >
-          <Text style={{ fontWeight: "600" }}>⟨ 저번주</Text>
+          <Text style={{ fontWeight: "600" }}>⟨ 지난주</Text>
         </Pressable>
 
         <Text style={{ fontSize: 16, fontWeight: "700" }}>{titleRange}</Text>

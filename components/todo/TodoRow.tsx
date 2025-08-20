@@ -69,7 +69,12 @@ export default function TodoRow({
       <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 10 }}>
         <Btn onPress={onOpenDetail} label="자세히" />
         <View style={{ width: 8 }} />
-        <Btn onPress={onRemove} label="삭제" danger disabled={!onRemove} />
+        <Btn
+          onPress={() => onRemove?.()}
+          label="삭제"
+          danger
+          disabled={!onRemove}
+        />
         <View style={{ width: 8 }} />
         <Btn onPress={() => setEditing(v => !v)} label={editing ? "완료" : "수정"} disabled={locked} />
       </View>

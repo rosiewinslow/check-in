@@ -1,36 +1,24 @@
 // app/(tabs)/todo.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useTodoStore } from "../../store/useTodoStore";
 import DayNav from "../../components/todo/DayNav";
 import TodoRow from "../../components/todo/TodoRow";
-import { toKstDateKey, todayKey, useDateKey } from "../../hooks/useKstDate";
+import { todayKey, useDateKey } from "../../hooks/useKstDate";
 
 export default function TodoScreen() {
   const router = useRouter();
   const {
     todos, add, addForDate, remove, rename, setProgress,
-    rolloverTo, isReadOnly, hydrateFromServer, syncUp,
+    rolloverTo, isReadOnly,
   } = useTodoStore() as any;
 
   const [text, setText] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const dateKey = useDateKey(selectedDate);
   const isPast = dateKey < todayKey();
-
-  // ✅ 오늘 입장 시 미완료 스냅샷 자동 이월
-  useEffect(() => {
-    const today = todayKey();
-    if (dateKey === today) rolloverTo(today);
-  }, [dateKey, rolloverTo]);
-
-  // ✅ 서버 동기화(유저별 분기는 RLS가 보장)
-  useEffect(() => { hydrateFromServer?.().catch(()=>{}); }, [hydrateFromServer]);
-  useEffect(() => {
-    const t = setInterval(() => { syncUp?.().catch(()=>{}); }, 8000);
-    return () => clearInterval(t);
-  }, [syncUp]);
+  const isToday = dateKey === todayKey();
 
   const onAdd = () => {
     const v = text.trim();
@@ -46,20 +34,16 @@ export default function TodoScreen() {
     setSelectedDate(d);
   };
 
-  // 해당 날짜 스냅샷만
+  // 해당 날짜 투두만 (date 키 기준)
   const daily = useMemo(() => {
     const list = todos.filter((t: any) => t.date === dateKey);
-    return list.sort((a: any, b: any) => Number(a.done) - Number(b.done) || b.createdAt - a.createdAt);
+    return list.sort(
+      (a: any, b: any) =>
+        Number((a.progress ?? 0) >= 100) - Number((b.progress ?? 0) >= 100) ||
+        (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) ||
+        b.createdAt - a.createdAt
+    );
   }, [todos, dateKey]);
-
-  // 🧪 개발용: 내일로 강제 이월 + 이동
-  const jumpOneDayAndRollover = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    const nextKey = toKstDateKey(d);
-    rolloverTo(nextKey);
-    setSelectedDate(d);
-  };
 
   return (
     <View style={{ flex: 1, padding: 16 }}>
@@ -68,16 +52,6 @@ export default function TodoScreen() {
         isPast={isPast}
         onPrev={() => moveDay(-1)}
         onNext={() => moveDay(+1)}
-        rightExtra={
-          __DEV__ ? (
-            <Pressable
-              onPress={jumpOneDayAndRollover}
-              style={{ backgroundColor: "#f0f0f0", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
-            >
-              <Text>내일로 이월(테스트)</Text>
-            </Pressable>
-          ) : undefined
-        }
       />
 
       {/* 입력 */}
@@ -105,6 +79,23 @@ export default function TodoScreen() {
         </Pressable>
       </View>
 
+      {/* 오늘일 때만 어제 미완료 가져오기 버튼 */}
+      {isToday && (
+        <View style={{ alignItems: "flex-end", marginBottom: 12 }}>
+          <Pressable
+            onPress={() => rolloverTo(todayKey())}
+            style={{
+              backgroundColor: "#eee",
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 6,
+            }}
+          >
+            <Text style={{ fontSize: 12, color: "#333" }}>어제 미완료 가져오기</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* 리스트 */}
       <FlatList
         data={daily}
@@ -112,7 +103,7 @@ export default function TodoScreen() {
         contentContainerStyle={{ paddingVertical: 8 }}
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         renderItem={({ item }) => {
-          const locked = isReadOnly(item);
+          const lockedForEdit = isPast;
           return (
             <TodoRow
               id={item.id}
@@ -122,10 +113,10 @@ export default function TodoScreen() {
               dueAt={item.dueAt}
               notifyAt={item.notifyAt}
               note={item.note}
-              locked={locked}
-              onRemove={!locked ? () => remove(item.id) : undefined}
-              onRename={!locked ? (t: string) => rename(item.id, t) : undefined}
-              onProgress={!locked ? (p: number) => setProgress(item.id, p) : undefined}
+              locked={lockedForEdit}
+              onRemove={!isPast ? () => remove(item.id) : undefined}
+              onRename={!lockedForEdit ? (t: string) => rename(item.id, t) : undefined}
+              onProgress={!lockedForEdit ? (p: number) => setProgress(item.id, p) : undefined}
               onOpenDetail={() =>
                 router.push({ pathname: "/(modal)/todo-detail", params: { id: item.id } })
               }

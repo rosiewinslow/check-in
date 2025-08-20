@@ -13,17 +13,101 @@ const fmtYYMMDD = (d: Date) => {
   return `${yy}.${mm}.${dd}`;
 };
 
+// 하단 스위칭 토글
+function BottomViewToggle({
+  mode,
+  onChange,
+}: {
+  mode: "list" | "grid";
+  onChange: (m: "list" | "grid") => void;
+}) {
+  const segBase = {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    minWidth: 110,
+  };
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        left: 16,
+        right: 16,
+        bottom: 18,
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: "white",
+          borderRadius: 24,
+          borderWidth: 1,
+          borderColor: "#E5E7EB",
+          padding: 4,
+          gap: 6,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 4,
+        }}
+      >
+        <Pressable
+          onPress={() => onChange("list")}
+          style={({ pressed }) => [
+            segBase,
+            {
+              backgroundColor: mode === "list" ? "#111" : "transparent",
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Text style={{ color: mode === "list" ? "white" : "#111", fontWeight: "700" }}>
+            리스트 보기
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onChange("grid")}
+          style={({ pressed }) => [
+            segBase,
+            {
+              backgroundColor: mode === "grid" ? "#111" : "transparent",
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Text style={{ color: mode === "grid" ? "white" : "#111", fontWeight: "700" }}>
+            타임테이블 보기
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function TimeCheckScreen() {
   const today = useMemo(() => new Date(), []);
   const [anchor, setAnchor] = useState(today);
   const dateKey = useMemo(() => toDateKey(anchor), [anchor]);
 
-  const { logs, add, setMemo, setStart, setEnd, remove } = useTimeLogStore();
+  const {
+    logs: rawLogs = [],
+    add,
+    setMemo,
+    setStart,
+    setEnd,
+    remove,
+  } = useTimeLogStore();
+  const logs = Array.isArray(rawLogs) ? rawLogs : [];
 
   const dayLogs = useMemo(
     () =>
-      logs
-        .filter((l) => l.dateKey === dateKey)
+      (logs ?? [])
+        .filter((l) => l?.dateKey === dateKey)
         .sort((a, b) =>
           a.start < b.start ? -1 : a.start > b.start ? 1 : a.createdAt - b.createdAt
         ),
@@ -37,45 +121,31 @@ export default function TimeCheckScreen() {
 
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
 
-  // ★ 리스트/타임테이블 토글
+  // 하단 고정 토글
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const toggleView = () => setViewMode((m) => (m === "list" ? "grid" : "list"));
 
-  // ★ 버튼 스타일(샘플과 동일)
-  const outlineBtn = ({ pressed }: { pressed: boolean }) => ({
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    opacity: pressed ? 0.7 : 1,
-  });
-  const blackBtn = ({ pressed }: { pressed: boolean }) => ({
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: "#111",
-    opacity: pressed ? 0.8 : 1,
-  });
+  // 기록 기준상 가장 이른 시작 시각
+  const earliestHour = useMemo(() => {
+    const firstStart = (dayLogs ?? [])
+      .map((l) => l?.start)
+      .filter((s): s is string => typeof s === "string" && s.includes(":"))
+      .sort()[0];
+    if (!firstStart) return 8;
+    const hh = Number(firstStart.split(":")[0]);
+    return Math.min(Math.max(hh, 0), 23);
+  }, [dayLogs]);
 
   return (
     <View style={{ flex: 1, padding: 16 }}>
       {/* 상단 날짜 스위처 */}
       <DaySwitcher label={fmtYYMMDD(anchor)} onPrev={goPrev} onNext={goNext} />
 
-      {/* ★ 뷰 토글 버튼 (오른쪽 정렬) */}
-      <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 8 }}>
-        <Pressable onPress={toggleView} style={outlineBtn}>
-          <Text>{viewMode === "list" ? "타임테이블 보기" : "리스트 보기"}</Text>
-        </Pressable>
-      </View>
-
+      {/* 컨텐츠 영역 */}
       {viewMode === "list" ? (
-        // ===== 리스트 뷰 =====
         <FlatList
           data={dayLogs}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 16 }}
+          contentContainerStyle={{ paddingBottom: 110 }}
           renderItem={({ item }) => (
             <TimeLogRow
               log={item}
@@ -101,31 +171,41 @@ export default function TimeCheckScreen() {
             </Text>
           }
           ListFooterComponent={
+            // 리스트 모드에서만 +추가 보이게 유지
             <View style={{ marginTop: 16, alignItems: "center" }}>
-              <Pressable onPress={() => add(dateKey)} style={blackBtn}>
+              <Pressable
+                onPress={() => add(dateKey)}
+                style={({ pressed }) => ({
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 10,
+                  backgroundColor: "#111",
+                  opacity: pressed ? 0.8 : 1,
+                })}
+              >
                 <Text style={{ color: "white", fontWeight: "700" }}>+ 추가</Text>
               </Pressable>
             </View>
           }
         />
       ) : (
-        // ===== 타임테이블 뷰 =====
         <View style={{ flex: 1, marginTop: 8 }}>
-          <TimeTableView
-            logs={dayLogs.map((l) => ({
-              start: l.start,
-              end: l.end,
-              memo: l.memo,
-            }))}
-          />
-          {/* 하단에도 +추가 버튼 유지하고 싶으면 표시 */}
-          <View style={{ marginTop: 8, alignItems: "center" }}>
-            <Pressable onPress={() => add(dateKey)} style={blackBtn}>
-              <Text style={{ color: "white", fontWeight: "700" }}>+ 추가</Text>
-            </Pressable>
+          {/* 타임테이블 뷰도 아래 토글 공간 확보 */}
+          <View style={{ flex: 1, paddingBottom: 110 }}>
+            <TimeTableView
+              logs={(dayLogs ?? []).map((l) => ({
+                start: l?.start ?? "00:00",
+                end: l?.end ?? null,
+                memo: l?.memo ?? "",
+              }))}
+              startHour={earliestHour}
+            />
           </View>
         </View>
       )}
+
+      {/* 하단 고정 세그먼트 토글 */}
+      <BottomViewToggle mode={viewMode} onChange={setViewMode} />
     </View>
   );
 }

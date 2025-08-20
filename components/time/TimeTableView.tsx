@@ -1,113 +1,179 @@
 // components/time/TimeTableView.tsx
-import { View, Text, ScrollView } from "react-native";
+import { ScrollView, View, Text } from "react-native";
 
 type Log = { start: string; end: string | null; memo: string };
 
+// 10분 슬롯: 0..143 (24*6)
 const toSlot = (hhmm: string) => {
   const [h, m] = hhmm.split(":").map(Number);
-  return h * 6 + Math.floor(m / 10); // 0..143
+  return h * 6 + Math.floor(m / 10);
 };
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** 하나의 날(0..143 슬롯)에서, 시간별로 겹치는 구간을 레인으로 배치 */
-export default function TimeTableView({ logs }: { logs: Log[] }) {
-  // 슬롯 범위로 변환(10분 스냅: 시작내림, 종료올림)
-  const ranges = logs
-    .filter(l => l.start && l.end)
-    .map(l => {
-      const s = toSlot(l.start);
-      const e = toSlot(l.end!);
-      const start = clamp(s, 0, 143);
-      const end = clamp(e, 0, 144); // 종료는 exclusive
-      return { start, end, label: l.memo || "활동" };
+// 해시 → 파스텔 HSL 색상
+const hash = (s: string) => {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+const colorOf = (label: string) => {
+  const h = hash(label) % 360;          // 0..359
+  const s = 70;                          // 파스텔용 채도
+  const l = 86;                          // 밝기
+  const l2 = 70;                          // 경계선/텍스트 대비
+  return {
+    bg: `hsl(${h} ${s}% ${l}%)`,
+    border: `hsl(${h} ${s - 20}% ${l2 - 8}%)`,
+    text: `hsl(${h} ${Math.max(30, s - 40)}% ${l2 - 25}%)`,
+  };
+};
+
+// helpers
+const toSlotStart = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 6 + Math.floor(m / 10);       // 0..143
+};
+const toSlotEnd = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  // ✅ 종료가 00:00이면 그날의 끝(24:00)로 본다.
+  if (h === 0 && m === 0) return 144;      // 24*6
+  return h * 6 + Math.ceil(m / 10);        // 종료는 올림이 자연스러움
+};
+
+export default function TimeTableView({ logs = [], startHour = 8 }: { logs?: Log[]; startHour?: number }) {
+  const ranges = (logs ?? [])
+    .filter((l) => l.start && l.end)
+    .map((l) => {
+      const start = clamp(toSlotStart(l.start), 0, 143);
+      const end = clamp(toSlotEnd(l.end!), 0, 144);   // exclusive
+      const label = l.memo?.trim() || "활동";
+      const col = colorOf(label);
+      return { start, end, label, col };
     })
-    // 0분 ~ 10분 같은 동시성 정렬 안정성
+    .filter(r => r.end > r.start) // 방어: 비정상 구간 제거
     .sort((a, b) => a.start - b.start || b.end - a.end);
 
-  // 시간별(24시간)로 레인 배치
-  // hourRows[hour] = Array<lane> ; lane = 6칸 배열(each cell: string | null)
-  const hourRows: { lanes: (Array<(string | null)>)[] }[] = Array.from({ length: 24 }, () => ({
-    lanes: [Array(6).fill(null)],
-  }));
 
-  // 각 range를 시간 단위로 잘라서 배치
-  ranges.forEach(r => {
+  const firstHour = Math.min(Math.max(startHour, 0), 23);
+  // 24:00 라벨까지 보여주려고 24 포함
+  const hours = Array.from({ length: 24 - firstHour + 1 }, (_, i) => firstHour + i);
+
+  // 시간별 레인 구성 + 연속 구간 압축(막대 세그먼트)
+  type Segment = { leftPct: number; widthPct: number; label: string; col: ReturnType<typeof colorOf> };
+  const hourLanes: { lanes: Segment[][] }[] = Array.from({ length: 24 }, () => ({ lanes: [[]] }));
+
+  // 우선 10분 단위로 레인 충돌 해결(칸 점유), 그 다음 같은 레인의 연속 조각을 하나로 합치기
+  const occupancy: Array<Array<Array<string | null>>> = Array.from({ length: 24 }, () =>
+    [Array(6).fill(null)] // lane 0
+  );
+
+  const placeSlice = (hour: number, offset: number, len: number, label: string): number => {
+    // 빈 레인 찾기
+    let lane = occupancy[hour].findIndex((ln) =>
+      Array.from({ length: len }, (_, i) => offset + i).every((c) => ln[c] === null)
+    );
+    if (lane === -1) {
+      occupancy[hour].push(Array(6).fill(null));
+      lane = occupancy[hour].length - 1;
+    }
+    for (let i = 0; i < len; i++) occupancy[hour][lane][offset + i] = label;
+    return lane;
+  };
+
+  ranges.forEach((r) => {
     let cur = r.start;
     while (cur < r.end) {
       const hour = Math.floor(cur / 6);
+      if (hour < firstHour || hour >= 24) {
+        const nextHour = (hour + 1) * 6;
+        cur = Math.max(cur + 1, nextHour);
+        continue;
+      }
       const hourStart = hour * 6;
       const hourEnd = hourStart + 6;
       const sliceStart = cur;
-      const sliceEnd = Math.min(r.end, hourEnd);
-      const len = sliceEnd - sliceStart; // 1..6
-      if (len > 0 && hour >= 0 && hour < 24) {
-        const offset = sliceStart - hourStart; // 0..5
-        const cellsNeeded = Array.from({ length: len }, (_, i) => offset + i); // 열 인덱스들
-
-        // 첫 번째로 모든 칸이 비어있는 레인 찾기, 없으면 새 레인 추가
-        let laneIdx = hourRows[hour].lanes.findIndex(lane =>
-          cellsNeeded.every(c => lane[c] === null)
-        );
-        if (laneIdx === -1) {
-          hourRows[hour].lanes.push(Array(6).fill(null));
-          laneIdx = hourRows[hour].lanes.length - 1;
+      const sliceEnd = Math.min(hourEnd, r.end);
+      const len = sliceEnd - sliceStart;
+      if (len > 0) {
+        const offset = sliceStart - hourStart;
+        const lane = placeSlice(hour, offset, len, r.label);
+        // 막대 세그먼트로 압축(퍼센트 기준)
+        const leftPct = (offset / 6) * 100;
+        const widthPct = (len / 6) * 100;
+        if (!hourLanes[hour].lanes[lane]) hourLanes[hour].lanes[lane] = [];
+        const prev = hourLanes[hour].lanes[lane][hourLanes[hour].lanes[lane].length - 1];
+        // 직전 세그먼트와 이어지면 합치기(연속성 + 동일 라벨)
+        const isCont = prev && Math.abs(prev.leftPct + prev.widthPct - leftPct) < 0.0001 && prev.label === r.label;
+        if (isCont) {
+          prev.widthPct += widthPct;
+        } else {
+          hourLanes[hour].lanes[lane].push({ leftPct, widthPct, label: r.label, col: r.col });
         }
-        // 채우기
-        cellsNeeded.forEach(c => (hourRows[hour].lanes[laneIdx][c] = r.label));
       }
-      cur = sliceEnd; // 다음 시간 블록으로
+      cur = sliceEnd;
     }
   });
 
   return (
     <ScrollView style={{ marginTop: 8 }}>
-      {hourRows.map((hr, h) => (
-        <View key={h} style={{ marginBottom: 6 }}>
-          {/* 왼쪽 시간 라벨 */}
-          <Text style={{ marginBottom: 4, color: "#666" }}>
-            {String(h).padStart(2, "0")}:00
-          </Text>
+      {hours.map((h) => {
+        const showTrack = h < 24;
+        return (
+          <View key={h} style={{ marginBottom: 10, flexDirection: "row", alignItems: "flex-start" }}>
+            {/* 시간 라벨 */}
+            <View style={{ width: 56, paddingRight: 6 }}>
+              <Text style={{ color: "#666" }}>{String(h).padStart(2, "0")}:00</Text>
+            </View>
 
-          {/* 레인들 (겹치면 줄 수가 늘어남) */}
-          {hr.lanes.map((lane, li) => (
-            <View
-              key={li}
-              style={{
-                flexDirection: "row",
-                gap: 4,
-                alignItems: "center",
-                // 셀 높이: 필요 시 조절
-              }}
-            >
-              {lane.map((label, ci) => (
+            {/* 트랙 영역 */}
+            <View style={{ flex: 1 }}>
+              {showTrack && (hourLanes[h].lanes.length ? hourLanes[h].lanes : [[]]).map((segments, li) => (
                 <View
-                  key={ci}
+                  key={`${h}-${li}`}
                   style={{
-                    flex: 1,
-                    height: 18,
+                    position: "relative",
+                    height: 24,
+                    marginBottom: 4,
                     borderWidth: 1,
                     borderColor: "#eee",
-                    borderRadius: 4,
-                    backgroundColor: label ? "#D1FAE5" /* 형광펜 느낌 연초록 */ : "white",
-                    justifyContent: "center",
-                    paddingHorizontal: 2,
+                    borderRadius: 6,
+                    backgroundColor: "#FAFAFA",
+                    overflow: "hidden",
                   }}
                 >
-                  {label && (
-                    <Text
-                      numberOfLines={1}
-                      style={{ fontSize: 10, color: "#065F46", fontWeight: "600" }}
+                  {/* 세그먼트(연속 구간 하나 = 막대 하나, 텍스트도 한 번만) */}
+                  {segments.map((seg, si) => (
+                    <View
+                      key={`${h}-${li}-${si}`}
+                      style={{
+                        position: "absolute",
+                        left: `${seg.leftPct}%`,
+                        width: `${seg.widthPct}%`,
+                        top: 2,
+                        bottom: 2,
+                        borderRadius: 6,
+                        backgroundColor: seg.col.bg,
+                        borderWidth: 1,
+                        borderColor: seg.col.border,
+                        justifyContent: "center",
+                        paddingHorizontal: 6,
+                      }}
                     >
-                      {label}
-                    </Text>
-                  )}
+                      <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: "700", color: seg.col.text }}>
+                        {seg.label}
+                      </Text>
+                    </View>
+                  ))}
                 </View>
               ))}
             </View>
-          ))}
-        </View>
-      ))}
-      <View style={{ height: 24 }} />
+          </View>
+        );
+      })}
+      <View style={{ height: 8 }} />
     </ScrollView>
   );
 }

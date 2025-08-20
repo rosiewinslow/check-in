@@ -9,6 +9,7 @@ import DiaryCard from "../../components/dashboard/DiaryCard";
 import TodoItem from "../../components/dashboard/TodoItem";
 import EmptyState from "../../components/dashboard/EmptyState";
 import useKeyboardAutoScroll from "../../hooks/useKeyboardAutoScroll";
+import type { Todo } from "../../types"; 
 
 export default function DashboardScreen() {
   const today = useMemo(() => new Date(), []);
@@ -17,24 +18,34 @@ export default function DashboardScreen() {
   const { todos } = useTodoStore();
   const { diaries, setDiary, removeDiary } = useDiaryStore();
 
-  //대시보드 진입 시 서버 데이터 불러오기
-  const { hydrateFromServer } = useTodoStore();
-  useEffect(() => { hydrateFromServer().catch(()=>{}); }, [hydrateFromServer]);
- //변경이 생길떄 주기적으로 서버에 밀어넣기
-  const { syncUp } = useTodoStore();
-  useEffect(() => {
-  const t = setInterval(() => { syncUp().catch(()=>{}); }, 8000);
-  return () => clearInterval(t);
-  }, [syncUp]);
+//   //대시보드 진입 시 서버 데이터 불러오기
+//   const { hydrateFromServer } = useTodoStore();
+//   useEffect(() => { hydrateFromServer().catch(()=>{}); }, [hydrateFromServer]);
+//  //변경이 생길떄 주기적으로 서버에 밀어넣기
+//   const { syncUp } = useTodoStore();
+//   useEffect(() => {
+//   const t = setInterval(() => { syncUp().catch(()=>{}); }, 8000);
+//   return () => clearInterval(t);
+//   }, [syncUp]);
 
 
   const listRef = useRef<FlatList>(null);
   const onDiaryFocus = useKeyboardAutoScroll(listRef); // 포커스 시 스크롤
 
   const dayTodos = useMemo(() => {
+    // 혹시 과거 데이터에 date가 비어있으면 createdAt으로 보정(임시 호환)
+    const normalizeDate = (t: Todo) =>
+      t.date && t.date.length === 10 ? t.date : toDateKey(new Date(t.createdAt));
+
+    const isDone = (t: Todo) => t.progress >= 100 || !!t.completedAt;
+
     return [...todos]
-      .filter(t => toDateKey(new Date(t.createdAt)) === selected)
-      .sort((a, b) => Number(a.done) - Number(b.done) || b.createdAt - a.createdAt);
+      .filter((t) => normalizeDate(t) === selected)
+      .sort((a, b) =>
+        Number(isDone(a)) - Number(isDone(b)) ||
+        (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) ||
+        b.createdAt - a.createdAt
+      );
   }, [todos, selected]);
   
 

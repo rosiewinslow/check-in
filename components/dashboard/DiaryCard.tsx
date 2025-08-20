@@ -51,7 +51,7 @@ export default function DiaryCard({ selected, diary, onSave, onDelete, onFocusIn
             onPress={() => { setMode("edit"); setTimeout(onFocusInput, 0); }}
             style={{ paddingVertical: 18, alignItems: "center", borderWidth: 1, borderStyle: "dashed", borderColor: "#E5E7EB", borderRadius: 12, backgroundColor: "#FAFAFA" }}
           >
-            <Text style={{ color: "#9CA3AF" }}>오늘 하루를 간단히 남겨볼까?</Text>
+            <Text style={{ color: "#9CA3AF" }}>오늘 하루를 간단히 기록해보세요.</Text>
           </Pressable>
         ) : (
           <View style={{ backgroundColor: "#FAFAFA", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#EFEFEF" }}>

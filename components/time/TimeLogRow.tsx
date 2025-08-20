@@ -1,7 +1,7 @@
 // components/time/TimeLogRow.tsx
 import { useEffect, useState, useMemo } from "react";
 import {
-  View, Text, Pressable, TextInput, Platform,
+  View, Text, Pressable, TextInput, Platform, Alert,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import type { TimeLog } from "../../store/useTimeLogStore";
@@ -51,6 +51,14 @@ export default function TimeLogRow({
   };
   const fmt = (d: Date) =>
     `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m; // 0..1439
+  };
+  // 종료 비교 전용: "00:00" 은 24:00(=1440분)으로 간주
+  const endMinutesForCompare = (endStr: string) =>
+    endStr === "00:00" ? 24 * 60 : toMinutes(endStr);
 
   const onPickStart = (_e: DateTimePickerEvent, date?: Date) => {
     if (!date) return;
@@ -103,7 +111,29 @@ export default function TimeLogRow({
   };
 
   const handleSave = () => {
-    onSave({ start: dStart, end: dEnd ?? null, memo: dMemo });
+    // 종료 미입력 → 바로 저장
+    if (!dEnd) {
+      onSave({ start: dStart, end: null, memo: dMemo.trim() });
+      close();
+      setEditing(false);
+      return;
+    }
+
+    const s = toMinutes(dStart);               // 0..1439
+    const e = endMinutesForCompare(dEnd);      // 1..1440 (00:00 → 1440)
+
+    // 24:00 초과 금지 (이론상 없음, 방어)
+    if (e > 24 * 60) {
+      Alert.alert("저장 실패", "종료 시간은 24:00을 넘길 수 없어요.");
+      return;
+    }
+    // 시작보다 같거나 빠른 종료 금지 (단, 00:00은 24:00으로 처리되므로 OK)
+    if (e <= s) {
+      Alert.alert("저장 실패", "종료 시간은 시작 시간보다 늦어야 해요.\n자정은 24:00으로 간주돼요.");
+      return;
+    }
+
+    onSave({ start: dStart, end: dEnd, memo: dMemo.trim() });
     close();
     setEditing(false);
   };
@@ -124,11 +154,25 @@ export default function TimeLogRow({
 
         {/* 오른쪽 버튼 그룹: 수정(아웃라인) / 삭제(블랙) */}
         <View style={{ flexDirection: "row", gap: 8 }}>
-          <Pressable onPress={handleEditStart} style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#cadafdff", opacity: pressed ? 0.8 : 1 })} >
+          <Pressable
+            onPress={handleEditStart}
+            style={({ pressed }) => ({
+              paddingHorizontal: 10, paddingVertical: 6,
+              borderRadius: 8, backgroundColor: "#cadafdff",
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
             <Text style={{ color: "#346fefff", fontWeight: "600" }}>수정</Text>
           </Pressable>
-          <Pressable onPress={onRemove} style={({ pressed }) => ({ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FEE2E2", opacity: pressed ? 0.8 : 1 })}>
-            <Text style={{  color: "#B00020", fontWeight: "600" }}>삭제</Text>
+          <Pressable
+            onPress={onRemove}
+            style={({ pressed }) => ({
+              paddingHorizontal: 10, paddingVertical: 6,
+              borderRadius: 8, backgroundColor: "#FEE2E2",
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ color: "#B00020", fontWeight: "600" }}>삭제</Text>
           </Pressable>
         </View>
       </View>

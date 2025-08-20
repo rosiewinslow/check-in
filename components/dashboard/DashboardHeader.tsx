@@ -10,14 +10,6 @@ export default function DashboardHeader({ selected, todoCount }: Props) {
         <Text style={{ fontSize: 16, fontWeight: "700" }}>{selected} 기록</Text>
         <Text style={{ color: "#666", marginTop: 6 }}>투두 {todoCount}개</Text>
       </View>
-      <Pressable
-        onPress={() => supabase.auth.signOut()}
-        style={({ pressed }) => ({
-          paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: "#ddd", opacity: pressed ? 0.7 : 1
-        })}
-      >
-        <Text style={{ fontWeight: "700" }}>로그아웃</Text>
-      </Pressable>
     </View>
   );
 }
