@@ -5,6 +5,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { nanoid } from "nanoid/non-secure";
 import * as Notifications from "expo-notifications";
 
+// ★ 추가: 원격 동기화 모듈
+import { remotePull, remoteUpsert, remoteDelete, StoreTodo as RemoteStoreTodo } from "../services/todoRemote";
+
 // 🆕 YYYY-MM-DD (Asia/Seoul)
 const toKstDateKey = (d = new Date()) => {
   const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
@@ -38,12 +41,14 @@ type State = {
   rename: (id: string, title: string) => void;
   setProgress: (id: string, p: number) => void;
   setDetail: (id: string, detail: { note?: string; dueAt?: number | null; notifyAt?: number | null }) => Promise<void>;
-
-  // 🆕 스냅샷 이월 (어제 미완료 → 오늘 복제 생성)
   rolloverTo: (dateKey: string) => void;
-
-  // 🆕 읽기 전용 여부 (과거일자)
   isReadOnly: (item: StoreTodo) => boolean;
+
+  // ★ 동기화 API (추가)
+  hydrateFromServer: () => Promise<void>;
+  syncUp: () => Promise<void>;
+  syncDown: () => Promise<void>;
+  syncAll: () => Promise<void>;
 };
 
 // --- 알림 유틸 (동일) ---
@@ -75,6 +80,12 @@ async function cancelScheduled(id?: string) {
   try { await Notifications.cancelScheduledNotificationAsync(id); } catch {}
 }
 
+// ★ 내부 outbox/삭제큐(메모리 전용: persist 안 함)
+const outbox = new Set<string>();
+const trash = new Set<string>();
+const markDirty = (id?: string) => { if (id) outbox.add(id); };
+const markDeleted = (id?: string) => { if (id) { trash.add(id); outbox.delete(id); } };
+
 export const useTodoStore = create<State>()(
   persist(
     (set, get) => ({
@@ -86,7 +97,7 @@ export const useTodoStore = create<State>()(
         const id = nanoid();
         const item: StoreTodo = {
           id,
-          originId: id,            // 🆕 최초 생성 → 자기 자신이 originId
+          originId: id,
           title: title.trim(),
           done: false,
           createdAt: now,
@@ -95,6 +106,7 @@ export const useTodoStore = create<State>()(
           date: todayKey(),
         };
         set({ todos: [...get().todos, item] });
+        markDirty(id);               // ★ 동기화 표시
       },
 
       addForDate: (dateKey, title) => {
@@ -102,7 +114,7 @@ export const useTodoStore = create<State>()(
         const id = nanoid();
         const item: StoreTodo = {
           id,
-          originId: id,            // 🆕 최초 생성 → 자기 자신이 originId
+          originId: id,
           title: title.trim(),
           done: false,
           createdAt: now,
@@ -111,6 +123,7 @@ export const useTodoStore = create<State>()(
           date: dateKey || todayKey(),
         };
         set({ todos: [...get().todos, item] });
+        markDirty(id);               // ★
       },
 
       // === 삭제 ===
@@ -118,6 +131,7 @@ export const useTodoStore = create<State>()(
         const target = get().todos.find(t => t.id === id);
         if (target?.notificationId) cancelScheduled(target.notificationId);
         set({ todos: get().todos.filter(t => t.id !== id) });
+        markDeleted(id);             // ★ 서버에서도 삭제
       },
 
       // === 제목 변경 (해당 스냅샷만) ===
@@ -126,6 +140,7 @@ export const useTodoStore = create<State>()(
         set({
           todos: get().todos.map(t => t.id === id ? { ...t, title: title.trim(), updatedAt: now } : t),
         });
+        markDirty(id);               // ★
       },
 
       // === 진행률 ===
@@ -150,6 +165,7 @@ export const useTodoStore = create<State>()(
             return nextObj;
           }),
         });
+        markDirty(id);               // ★
       },
 
       // === 디테일 저장 ===
@@ -184,12 +200,12 @@ export const useTodoStore = create<State>()(
           updatedAt: now,
         };
         set({ todos: list.map(t => (t.id === id ? patched : t)) });
+        markDirty(id);               // ★
       },
 
       // === 스냅샷 이월 ===
       rolloverTo: (dateK) => {
         const list = get().todos;
-        // originId별로 “오늘 이전의 가장 최신 스냅샷”을 찾아서 미완료면 오늘 사본 생성
         const byOrigin = new Map<string, StoreTodo[]>();
         for (const t of list) {
           if (!byOrigin.has(t.originId)) byOrigin.set(t.originId, []);
@@ -200,25 +216,24 @@ export const useTodoStore = create<State>()(
         const newOnes: StoreTodo[] = [];
 
         for (const [originId, arr] of byOrigin) {
-          // 최신순 정렬
           arr.sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt));
-          const latestBefore = arr.find(t => t.date < dateK); // date 문자열 비교로 KST 일자 비교
+          const latestBefore = arr.find(t => t.date < dateK);
           if (!latestBefore) continue;
 
           if (latestBefore.progress < 100 && !existToday.has(originId)) {
             const now = Date.now();
+            const id = nanoid();
             newOnes.push({
-              id: nanoid(),
+              id,
               originId,
-              title: latestBefore.title,     // 제목/속성은 이어받음
-              done: false,                   // 새날은 미완료로 시작
+              title: latestBefore.title,
+              done: false,
               createdAt: now,
               updatedAt: now,
-              progress: latestBefore.progress, // ⬅️ 전일 진행률 이어받기
+              progress: latestBefore.progress,
               date: dateK,
-              // note/due/notify는 새날엔 비우는 걸 기본값으로 둠 (일별 메모/마감 분리)
-              // 필요한 경우 latestBefore.note 등을 복사해도 됨
             });
+            markDirty(id);           // ★ 새 스냅샷도 서버 업서트
           }
         }
 
@@ -227,25 +242,68 @@ export const useTodoStore = create<State>()(
 
       // === 읽기 전용 판별 ===
       isReadOnly: (item) => item.date < todayKey(), // 🔒 과거일자면 잠금
+
+      // ── ★ 동기화 API ────────────────────────────────────────────
+      hydrateFromServer: async () => {
+        // 서버 → 로컬 (LWW: updatedAt 기준 최신값 유지)
+        const serverRows = await remotePull(); // StoreTodo[]
+        const local = get().todos;
+        const map = new Map<string, StoreTodo>();
+        for (const t of local) map.set(t.id, t);
+        for (const srv of serverRows) {
+          const cur = map.get(srv.id);
+          const curUpdated = cur?.updatedAt ?? 0;
+          const srvUpdated = srv.updatedAt ?? 0;
+          if (!cur || srvUpdated > curUpdated) {
+            map.set(srv.id, srv);
+          }
+        }
+        set({ todos: Array.from(map.values()) });
+      },
+
+      syncUp: async () => {
+        // 삭제 먼저
+        const delIds = Array.from(trash.values());
+        if (delIds.length) {
+          await remoteDelete(delIds);
+          trash.clear();
+        }
+        // outbox 업서트
+        const ids = Array.from(outbox.values());
+        if (!ids.length) return;
+        const payload = get().todos.filter(t => ids.includes(t.id));
+        if (payload.length) {
+          await remoteUpsert(payload as RemoteStoreTodo[]);
+        }
+        outbox.clear();
+      },
+
+      syncDown: async () => {
+        await get().hydrateFromServer();
+      },
+
+      syncAll: async () => {
+        await get().syncUp();
+        await get().syncDown();
+      },
     }),
     {
-      name: "todo-store-v4",          // 🆕 버전업
+      name: "todo-store-v4",
       storage: createJSONStorage(() => AsyncStorage),
       version: 4,
       migrate: (state: any, version) => {
         if (!state?.state?.todos) return state;
         const now = Date.now();
-        // v3 → v4: originId 채우기, date 보정
         if (version < 4) {
           state.state.todos = state.state.todos.map((t: any) => ({
-            originId: t.originId ?? t.id,                 // 🆕
+            originId: t.originId ?? t.id,
             date: t.date ?? toKstDateKey(new Date(t.createdAt || now)),
             ...t,
           }));
         }
         return state;
       },
-      partialize: (s) => ({ todos: s.todos }),
+      partialize: (s) => ({ todos: s.todos }), // outbox/trash는 저장 안 함
     }
   )
 );

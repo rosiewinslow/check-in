@@ -1,32 +1,23 @@
+import { AUTH_ENABLED } from "../config/appConfig";
 import { supabase } from "../lib/supabase";
 
-export async function signUp(email: string, password: string) {
-  // 개발 중엔 이메일 확인 꺼놨으니 바로 로그인됨
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
-  return data.user;
+export async function signInEmailPassword(email: string, password: string) {
+  if (!AUTH_ENABLED) return { session: null, user: null }; // ✅ 무시
+  return supabase.auth.signInWithPassword({ email, password });
 }
 
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data.user;
+export async function signUpEmailPassword(email: string, password: string) {
+  if (!AUTH_ENABLED) return { session: null, user: null };
+  return supabase.auth.signUp({ email, password });
 }
 
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+export async function signOutAll() {
+  if (!AUTH_ENABLED) return;
+  await supabase.auth.signOut({ scope: "global" });
 }
 
 export async function getCurrentUser() {
-  const { data } = await supabase.auth.getUser();
-  return data.user; // null이면 비로그인
-}
-
-/** CRUD에서 user_id 넣어야 하니 이 헬퍼 씀 */
-export async function getUserId(): Promise<string> {
-  const { data } = await supabase.auth.getUser();
-  const id = data.user?.id;
-  if (!id) throw new Error("Not signed in");
-  return id;
+  if (!AUTH_ENABLED) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  return user ?? null;
 }

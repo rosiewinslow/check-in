@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from "react";
+import { useEffect } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
 import { useTodoStore } from "../../store/useTodoStore";
 import { useDiaryStore, toDateKey } from "../../store/useDiaryStore";
@@ -16,6 +17,17 @@ export default function DashboardScreen() {
   const { todos } = useTodoStore();
   const { diaries, setDiary, removeDiary } = useDiaryStore();
 
+  //대시보드 진입 시 서버 데이터 불러오기
+  const { hydrateFromServer } = useTodoStore();
+  useEffect(() => { hydrateFromServer().catch(()=>{}); }, [hydrateFromServer]);
+ //변경이 생길떄 주기적으로 서버에 밀어넣기
+  const { syncUp } = useTodoStore();
+  useEffect(() => {
+  const t = setInterval(() => { syncUp().catch(()=>{}); }, 8000);
+  return () => clearInterval(t);
+  }, [syncUp]);
+
+
   const listRef = useRef<FlatList>(null);
   const onDiaryFocus = useKeyboardAutoScroll(listRef); // 포커스 시 스크롤
 
@@ -24,6 +36,7 @@ export default function DashboardScreen() {
       .filter(t => toDateKey(new Date(t.createdAt)) === selected)
       .sort((a, b) => Number(a.done) - Number(b.done) || b.createdAt - a.createdAt);
   }, [todos, selected]);
+  
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.select({ ios: "padding", android: undefined })}>
