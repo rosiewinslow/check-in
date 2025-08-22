@@ -5,7 +5,14 @@ export default function TabsLayout() {
   return (
     <Tabs
       initialRouteName="dashboard" // 앱 켜면 기본으로 열리는 기본 탭. 
-      screenOptions={{ headerTitleAlign: "center" }}
+      screenOptions={{ headerTitleAlign: "center"
+                      , sceneStyle: { backgroundColor: "transparent" }
+                      , tabBarStyle: {
+                        backgroundColor: "rgba(250,249,246,0.9)",
+                        borderTopWidth: 0,
+                        elevation: 0,
+                        },
+                      }}
     >
       <Tabs.Screen name="todo" options={{ title: "투두리스트" }} />
       <Tabs.Screen name="habits" options={{ title: "습관트래커" }} />

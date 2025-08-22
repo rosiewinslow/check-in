@@ -26,8 +26,14 @@ const dateKey = (d: Date) =>
   ).padStart(2, "0")}`;
 
 const palette = [
-  "#A3E635", "#60A5FA", "#F472B6", "#F59E0B",
-  "#34D399", "#C084FC", "#F87171", "#22D3EE",
+  "#B99668", // Amber Sandstone (따뜻한 골드빛 모래톤)
+  "#8A724C", // Golden Olive (고급스러운 카키 브라운톤)
+  "#DCC9A7", // Silken Dune (부드러운 샌드 베이지)
+  "#EDE2CC", // Champagne Veil (아이보리 샴페인톤)
+  "#F7F3E8", // Ivory Whisper (밝은 크림톤, 서브용)
+  "#CBB8A0", // Soft Taupe (호텔 가구/가죽 느낌)
+  "#9C8F7A", // Smoky Beige (중성톤, 다른 컬러 보완)
+  "#BFA06A", // Desert Gold (더 진한 포인트 골드)
 ];
 
 const rid = () => `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;

@@ -26,7 +26,7 @@ export default function DaySwitcher({
           borderWidth: 1, borderColor: "#ddd", borderRadius: 8,
         }}
       >
-        <Text style={{ fontWeight: "600" }}>⟨ 저번날</Text>
+        <Text style={{ fontWeight: "600" }}>⟨ 지난날</Text>
       </Pressable>
 
       <Text style={{ fontSize: 16, fontWeight: "700" }}>{label}</Text>

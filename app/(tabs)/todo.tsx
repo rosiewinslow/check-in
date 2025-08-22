@@ -6,6 +6,7 @@ import { useTodoStore } from "../../store/useTodoStore";
 import DayNav from "../../components/todo/DayNav";
 import TodoRow from "../../components/todo/TodoRow";
 import { todayKey, useDateKey } from "../../hooks/useKstDate";
+import { KeyboardAvoidingView, Platform } from "react-native";
 
 export default function TodoScreen() {
   const router = useRouter();
@@ -46,6 +47,10 @@ export default function TodoScreen() {
   }, [todos, dateKey]);
 
   return (
+     <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
     <View style={{ flex: 1, padding: 16 }}>
       <DayNav
         label={dateKey}
@@ -130,5 +135,6 @@ export default function TodoScreen() {
         )}
       />
     </View>
+    </KeyboardAvoidingView>
   );
 }

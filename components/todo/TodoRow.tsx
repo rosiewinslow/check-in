@@ -4,6 +4,25 @@ import { View, Text, TextInput } from "react-native";
 import Slider from "@react-native-community/slider";
 import { Badge, Btn } from "./Small";
 
+// 날짜 + 시간 포맷
+function formatDateTime(ts?: number) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yy}.${mm}.${dd} ${hh}:${min}`;
+}
+function formatTime(ts?: number) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 export default function TodoRow({
   id, title, done, progress, onRemove, onRename, onProgress, onOpenDetail,
   dueAt, notifyAt, note, locked,
@@ -20,9 +39,9 @@ export default function TodoRow({
     if (v && v !== title && onRename) onRename(v);
     setEditing(false);
   };
-
-  const dueText = dueAt ? new Date(dueAt).toLocaleString() : "";
-  const notiText = notifyAt ? new Date(notifyAt).toLocaleTimeString() : "";
+  
+  const dueText = dueAt ? formatDateTime(dueAt) : "";
+  const notiText = notifyAt ? formatTime(notifyAt) : "";
 
   return (
     <View

@@ -22,12 +22,11 @@ function BottomViewToggle({
   onChange: (m: "list" | "grid") => void;
 }) {
   const segBase = {
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 18,
     borderRadius: 20,
     alignItems: "center" as const,
     justifyContent: "center" as const,
-    minWidth: 110,
   };
 
   return (
@@ -191,7 +190,7 @@ export default function TimeCheckScreen() {
       ) : (
         <View style={{ flex: 1, marginTop: 8 }}>
           {/* 타임테이블 뷰도 아래 토글 공간 확보 */}
-          <View style={{ flex: 1, paddingBottom: 110 }}>
+          <View style={{ flex: 1, paddingBottom: 10 }}>
             <TimeTableView
               logs={(dayLogs ?? []).map((l) => ({
                 start: l?.start ?? "00:00",
@@ -204,7 +203,7 @@ export default function TimeCheckScreen() {
         </View>
       )}
 
-      {/* 하단 고정 세그먼트 토글 */}
+      {/* 하단 고정 스위칭 토글 */}
       <BottomViewToggle mode={viewMode} onChange={setViewMode} />
     </View>
   );
