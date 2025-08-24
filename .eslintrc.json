@@ -1,0 +1,13 @@
+{
+  "extends": ["@react-native-community", "plugin:@typescript-eslint/recommended", "prettier"],
+  "parserOptions": { "project": ["tsconfig.json"] },
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "off",
+    "react/react-in-jsx-scope": "off",
+    "import/no-cycle": "warn",
+    "no-restricted-imports": [
+      "warn",
+      { "patterns": ["../*"] }  // 상위상대경로 남용 방지 (tscongif.json 별칭 쓰기)
+    ]
+  }
+}
