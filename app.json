@@ -1,10 +1,15 @@
 {
   "expo": {
-    "plugins": ["expo-router"],
-    "experiments": { "typedRoutes": true },
+    "plugins": [
+      "expo-router"
+    ],
+    "name": "myapp",
+    "scheme": "checkin",
+    "ios": { "bundleIdentifier": "com.rosie.checkin-dev2" },
+    "experiments": {
+      "typedRoutes": true
+    },
     "entryPoint": "expo-router/entry",
-    
-    "name": "my-app",
     "slug": "my-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,15 +21,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.myapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
